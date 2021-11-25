@@ -1,0 +1,324 @@
+---
+title: "TextStat21"
+author: "Ea Toft"
+date: "25/11/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Følgende pakker skal vi bruge:
+```{r}
+library(tidyverse)
+library(tidytext)
+library(lubridate)
+```
+Hvis du har problemer med at køre et 'library', så prøv at installere pågældende bibliotek i konsollen ved eksempelvis at skrive "install("tidyverse")".
+
+## Teststørrelser og signifikansniveau.
+Vi starter med et eksempel, der skal tydeliggøre hvad teststørrelsen gør for resultatet af et statistisk test.
+
+Vi har spurgt 100 mænd, og 100 kvinder om der er for få toiletter på matematisk institut. Fem kvinder og ti mænd svarer ja til sprøgsmålet, og resten svarer nej. Er der faktisk forskel på mænd og kvinders svar på baggrund af undersøgelsen?  
+Vi vælger at teste hypotesen: "Andelen af mænd og kvinder der mener at der er for få toiletter på matematisk institut er den samme". Det formulerer vi som vores 'nulhypotese':
+
+$$
+H_0: \text{Andel af ja-svar fra mænd} = \text{Andel ja-svar fra kvinder}
+$$
+Denne hypotese stiller vi op mod alternativhypotesen "andelen af hhv. mænd og kvinder der mener at der er for få toiletter på matematisk institut er forskellig". Den alternative hypotese kaldes for:
+$$
+H_A: \text{Andel af ja-svar fra mænd} \neq \text{Andel ja-svar fra kvinder} 
+$$
+Vi vil gerne lave et test med signifikantsniveau på 0.05. Testen er et prop-test, som tester for om andele i forskellige grupper kan siges at være de samme indenfor et bestemt konfidensinterval (læs mere her: https://www.rdocumentation.org/packages/stats/versions/3.6.2/topics/prop.test) Her har vi gruppen "kvinder" og "mænd" med andelene "5 ud af 100" og "10 ud af 100".
+
+```{r}
+prop.test(c(5, 10), c(100, 100), alternative = c("two.sided"))
+```
+Hvis p-værdien er under 0.05 forkastes nulhypotesen, og der er altså statistisk signifikans for alternativhypotesen. I dette tilfælde er p-værdien 0.28, og man vil altså ikke kunne konkludere at der var forkel på om hhv. mænd og kvinder mener at der er for få toiletter på matematisk institut.
+
+Lad os nu lave samme forsøg på BSS. Her spørger vi 1000 mænd og 1000 kvinder. 50 kvinder og 100 mænd svarer ja, altså den samme andel af kvinder og mænd som i forrige forsøg, men er der statistisk signifikans for forskellen nu?
+
+```{r}
+prop.test(c(50, 100), c(1000, 1000), alternative = c("two.sided"))
+```
+Nu er p-værdien meget lille (under 0.05), og man kan altså konkludere at der er forskel på andelen af hhv. mænd og kvinder på BSS der mener, at der er for få toiletter på matematisk institut, selvom det er de samme andele der har svaret ja som tidligere. Dette handler om stikprøvestørrelsen.
+
+## Partitaler
+
+Vi vil først gerne hente vores data
+```{r}
+URL <- 'https://raw.githubusercontent.com/codingclubartsau/TextStat/main/Parti_ud_slut.csv'
+data <- read.csv(URL)
+
+colnames(data)[6] <- "År_int"
+
+```
+
+I data har vi forskellige taler, hvor den ældste er fra 1901. Der er dog ikke så mange af de helt gamle taler, og Dansk Folkeparti kommer første med fra 1995. Derfor vil vi gerne kigge på taler efter 1994.
+
+
+```{r}
+data_efter_1995 <- subset(data, data$År_int>1994)
+```
+
+Vi vil også gerne kunne undersøge talerne fra de forskellige partier hver for sig. Det gør vi ved at filtrere i datasættet efter partiernes navne.
+
+Dansk Folkeparti
+```{r}
+data_efter_1995 %>%
+  filter(Parti == "dansk-folkeparti") -> df_efter_1995
+```
+Venstre
+```{r}
+data_efter_1995 %>%
+  filter(Parti == "venstre") -> V_efter_1995
+```
+Socialdemokratiet
+```{r}
+data_efter_1995 %>%
+  filter(Parti == "socialdemokratiet") -> S_efter_1995
+```
+
+Vi vil gerne undersøge om der er forskel i hvor meget de forskellige partier taler om indvandrere. 
+
+Vi undersøger først Dansk Folkeparti
+```{r}
+df_efter_1995 %>%
+  unnest_tokens(word, Tale) %>%
+  filter(str_detect(word, "indvandr[a-zæøå]*")) -> df_indvandrer_ord
+```
+
+Vi skal huske at vi skal holde antallet af gange indvandre nævnes op mod hovr mange ord der er i alt.
+```{r}
+df_efter_1995 %>%
+  unnest_tokens(word, Tale) -> df_ord
+```
+
+```{r}
+df_antal_indvandrer_ord <-length(df_indvandrer_ord$X)
+df_antal_ord <-length(df_ord$X)
+```
+
+Vi gør det samme med Venstre.
+```{r}
+V_efter_1995 %>%
+  unnest_tokens(word, Tale) %>%
+  filter(str_detect(word, "indvandr[a-zæøå]*")) -> V_indvandrer_ord
+```
+
+```{r}
+V_efter_1995 %>%
+  unnest_tokens(word, Tale) -> V_ord
+```
+
+```{r}
+V_antal_indvandrer_ord <- length(V_indvandrer_ord$X)
+V_antal_ord <- length(V_ord$X)
+```
+
+Vi kan nu lave et test for om der er forskel i andelen hvor hhv. Dansk Folkeparti og Venstre bruger ord med "indvandr*".
+
+Vi opstiller en nulhypotese, som er den vi tester for.
+
+$$
+H_0: \text{Andel "indvandr*" nævnes fra DF} = \text{Andel "indvandr*" nævnes fra Venstre}
+$$
+Vores alternative hypotese er så:
+$$
+H_A: \text{Andel "indvandr*" nævnes fra DF} \neq   \text{Andel "indvandr*" nævnes fra Venstre}
+$$
+Vi tester hypotesen med et proptest og vælger igen et signifikantsniveau på 0.05.
+
+```{r}
+prop.test(c(df_antal_indvandrer_ord, V_antal_indvandrer_ord), c(df_antal_ord, V_antal_ord), alternative = c("greater"))
+```
+```{r}
+format(2.121e-08,scientific = FALSE)
+```
+
+Vi får en p-værdi der ganske lav, og da vi ikke ligger indenfor det acceptable interval (har en p-værdi på over 0.05) strider data imod nulhypotesen, og den alternative hypotese må derfor accepteres.
+
+Kan vi se i outputtet hvilket parti der ifølge data nævner indvandrere mest?
+
+Vi vil også gerne teste om der er forskel imellem Venstre og Socialdemokratiet.
+```{r}
+S_efter_1995 %>%
+  unnest_tokens(word, Tale) %>%
+  filter(str_detect(word, "indvandr[a-zæøå]*")) -> S_indvandrer_ord
+```
+
+```{r}
+S_efter_1995 %>%
+  unnest_tokens(word, Tale) -> S_ord
+```
+
+```{r}
+S_antal_indvandrer_ord <- length(S_indvandrer_ord$X)
+S_antal_ord <- length(S_ord$X)
+```
+
+Vi laver igen et proptest, og denne gang ser vores hypoteser således ud:
+
+Vi opstiller en nulhypotese, som er den vi tester for.
+
+$$
+H_0: \text{Andel "indvandr*" nævnes fra S} = \text{Andel "indvandr*" nævnes fra V}
+$$
+Vores alternative hypotese er så:
+$$
+H_A: \text{Andel "indvandr*" nævnes fra S} \neq   \text{Andel "indvandr*" nævnes fra V}
+$$
+Vi tester hypotesen med et proptest og vælger igen et signifikantsniveau på 0.05.
+
+```{r}
+prop.test(c(S_antal_indvandrer_ord, V_antal_indvandrer_ord), c(S_antal_ord, V_antal_ord))
+```
+```{r}
+format(4.786e-08,scientific = FALSE)
+```
+
+Vi får nu en større p-værdi, og data strider derfor ikke imod vores nulhypotese.
+
+Vi har nu kigget på andele af alle ord i alle talerne på en gang. Men måske er det en fordel at kigge på hver tale som en måling, i stedet for at se på den samlede sum over alle talers ord, da der måske kun er een tale eller to taler, der står for alle forekomster af "indvandre". Vi vil derfor gerne kigge på tendensen i de individuelle taler.
+
+Først skal vi have trukket andelen af ord der handler om indvandring ud af hver tale. Vi starter med Dansk Folkeparti:
+```{r}
+df_indvandring_andel_tale <- c()
+for(i in 1:length(df_efter_1995$X)) {
+  tale <- df_efter_1995[i,]
+  antal_indvandre_ord <- length(str_extract_all(tale$Tale, "indvandr[a-zæøå]*")[[1]])
+  tale %>%
+    unnest_tokens(word, Tale) -> tale_ord
+  tale_antal_ord <- length(tale_ord$X)
+  andel_indvandre_ord <- antal_indvandre_ord/tale_antal_ord 
+  df_indvandring_andel_tale <- append(df_indvandring_andel_tale, andel_indvandre_ord)
+}
+```
+Vi får nu gemt en vektor med alle andelene.
+```{r}
+df_indvandring_andel_tale
+```
+
+Vi laver et plot der illusterer hvor stor en andel af hver tale ordet "indvandr*" er.
+```{r}
+barplot(df_indvandring_andel_tale, col="seagreen")
+```
+Det samme gør vi for de andre partier.
+
+Socialdemokratiet
+```{r}
+S_indvandring_andel_tale <- c()
+for(i in 1:length(S_efter_1995$X)) {
+  tale <- S_efter_1995[i,]
+  antal_indvandre_ord <- length(str_extract_all(tale$Tale, "indvandr[a-zæøå]*")[[1]])
+  tale %>%
+    unnest_tokens(word, Tale) -> tale_ord
+  tale_antal_ord <- length(tale_ord$X)
+  andel_indvandre_ord <- antal_indvandre_ord/tale_antal_ord 
+  S_indvandring_andel_tale <- append(S_indvandring_andel_tale, andel_indvandre_ord)
+}
+```
+
+```{r}
+S_indvandring_andel_tale
+```
+```{r}
+barplot(S_indvandring_andel_tale, col="seagreen2")
+```
+Venstre
+```{r}
+V_indvandring_andel_tale <- c()
+for(i in 1:length(V_efter_1995$X)) {
+  tale <- V_efter_1995[i,]
+  antal_indvandre_ord <- length(str_extract_all(tale$Tale, "indvandr[a-zæøå]*")[[1]])
+  tale %>%
+    unnest_tokens(word, Tale) -> tale_ord
+  tale_antal_ord <- length(tale_ord$X)
+  andel_indvandre_ord <- antal_indvandre_ord/tale_antal_ord 
+  V_indvandring_andel_tale <- append(V_indvandring_andel_tale, andel_indvandre_ord)
+}
+```
+
+```{r}
+S_indvandring_andel_tale
+```
+```{r}
+barplot(V_indvandring_andel_tale, col="seagreen4")
+```
+Når vi kigger på de forskellige plots, så kan det godt se ud som om at Socialdemokratiet generelt omtaler indvandrere færre gange end både socialdemokratiet og venstre. Huske at lægge mærke til y-akserne!
+
+```{r}
+barplot(df_indvandring_andel_tale,col="green", beside = TRUE, ylim=c(0,0.008)) 
+barplot(V_indvandring_andel_tale,col="red", beside=TRUE, ylim=c(0,0.008))
+barplot(S_indvandring_andel_tale, col="blue", beside = TRUE, ylim=c(0,0.008))
+```
+
+Vi vil gerne lave et test på om der er forskel i partierne, men vi kan ikke bruge prop.test nu, da vi har så mange målinger med forskellige andele indefor hver gruppe.
+
+Vi kan lave et permutationstest for to af partierne af gangen.
+Et permutationstest forklares her: https://www.jwilber.me/permutationtest/
+
+Da vi har mange forskellige målinger pr. gruppe vil vi lave testet over hver gruppes gennemsnit for benævnelsen af indvandre pr. tale. Vi kalder gennemsnittet for partierne my. Vi tester altså for forskelle i gennemsnittene.
+
+Vi laver et test med følgende hypotese:
+
+$$
+H_0: \mu_{DF} = \mu_{Venstre}
+$$
+Vores alternative hypotese er så:
+$$
+H_A: \mu_{DF} \neq   \mu_{Venstre}
+$$
+Vi vælger igen et signifikantsniveau på 0.05.
+
+```{r}
+observed <- mean(df_indvandring_andel_tale) - mean(V_indvandring_andel_tale)
+V_og_df_andel_tale <- c(df_indvandring_andel_tale, V_indvandring_andel_tale)
+length(V_og_df_andel_tale)
+N <- 10^4-1
+result <- numeric(N)
+for (i in 1:N){
+  index <- sample(112, size = 53, replace = FALSE)
+  result[i] <- mean(V_og_df_andel_tale[index])-mean(V_og_df_andel_tale[-index])
+}
+hist(result, xlab = "Forskel i gennemsnit", main = "Permutationsfordeling for df og venstre", col="lightgreen")
+abline(v = observed, col="red")
+(sum(result >= observed)+1)/(N+1)
+```
+
+Vi får en p-værdi på
+```{r}
+format(4e-04,scientific = FALSE)
+```
+Da denne ligger under vores signifikansniveau på 0.05 strider data imod nulhypotesen, som kan forkastes til fordel for den alternative hypotese.
+
+Vi tester det samme for Socialdemokratiet og Venstre.
+
+
+$$
+H_0: \mu_{Socialdemokratiet} = \mu_{Venstre}
+$$
+Vores alternative hypotese er så:
+$$
+H_A: \mu_{Socialdemokratiet} \neq   \mu_{Venstre}
+$$
+Vi vælger igen et signifikantsniveau på 0.05.
+
+```{r}
+observed <- mean(S_indvandring_andel_tale) - mean(V_indvandring_andel_tale)
+S_og_V_andel_tale <- c(S_indvandring_andel_tale, V_indvandring_andel_tale)
+N <- 10^4-1
+result <- numeric(N)
+for (i in 1:N){
+  index <- sample(114, size = 85, replace = FALSE)
+  result[i] <- mean(S_og_V_andel_tale[index])-mean(S_og_V_andel_tale[-index])
+}
+hist(result, xlab = "Forskel i gennemsnit", main = "Permutationsfordeling for Socaldemokratiet og Venstre", col="lightblue")
+abline(v = observed, col="red")
+pvalue <- 2*(min(((sum(result <= observed)+1)/(N+1)),((sum(result >= observed)+1)/(N+1)))) 
+pvalue
+```
+
+Vi får en p-værdi på over 0.05, der altså ligger over vores signifikansniveau på 0.05. Data strider ikke imod nulhypotesen om ens gennemsnit for de to partier.
+
