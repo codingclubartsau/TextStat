@@ -35,14 +35,14 @@ Vi vil gerne lave et test med signifikantsniveau på 0.05. Testen er et prop-tes
 ```{r}
 prop.test(c(5, 10), c(100, 100), alternative = c("two.sided"))
 ```
-Hvis p-værdien er under 0.05 forkastes nulhypotesen, og der er altså statistisk signifikans for alternativhypotesen. I dette tilfælde er p-værdien 0.28, og man vil altså ikke kunne konkludere at der var forkel på om hhv. mænd og kvinder mener at der er for få toiletter på matematisk institut.
+Hvis p-værdien er under 0.05 strider data imod nulhypotesen og der er i stedet statistisk signifikans for alternativhypotesen. I dette tilfælde er p-værdien 0.28, og man vil altså ikke kunne konkludere at der er forskel på om hhv. mænd og kvinder mener at der er for få toiletter på matematisk institut.
 
 Lad os nu lave samme forsøg på BSS. Her spørger vi 1000 mænd og 1000 kvinder. 50 kvinder og 100 mænd svarer ja, altså den samme andel af kvinder og mænd som i forrige forsøg, men er der statistisk signifikans for forskellen nu?
 
 ```{r}
 prop.test(c(50, 100), c(1000, 1000), alternative = c("two.sided"))
 ```
-Nu er p-værdien meget lille (under 0.05), og man kan altså konkludere at der er forskel på andelen af hhv. mænd og kvinder på BSS der mener, at der er for få toiletter på matematisk institut, selvom det er de samme andele der har svaret ja som tidligere. Dette handler om stikprøvestørrelsen.
+Nu er p-værdien meget lille (under 0.05), og data strider imod nulhypotesen, og taler for den alternative hypotese om at der er forskel på andelen af hhv. mænd og kvinder på BSS der mener, at der er for få toiletter på matematisk institut, selvom det er de samme andele der har svaret ja som tidligere. Dette handler om stikprøvestørrelsen.
 
 ## Partitaler
 
@@ -89,7 +89,7 @@ df_efter_1995 %>%
   filter(str_detect(word, "indvandr[a-zæøå]*")) -> df_indvandrer_ord
 ```
 
-Vi skal huske at vi skal holde antallet af gange indvandre nævnes op mod hovr mange ord der er i alt.
+Vi skal huske at vi skal holde antallet af gange indvandre nævnes op mod hvor mange ord der er i alt.
 ```{r}
 df_efter_1995 %>%
   unnest_tokens(word, Tale) -> df_ord
@@ -178,7 +178,7 @@ prop.test(c(S_antal_indvandrer_ord, V_antal_indvandrer_ord), c(S_antal_ord, V_an
 format(4.786e-08,scientific = FALSE)
 ```
 
-Vi får nu en større p-værdi, og data strider derfor ikke imod vores nulhypotese.
+Hvad bliver konklusionen her? 
 
 Vi har nu kigget på andele af alle ord i alle talerne på en gang. Men måske er det en fordel at kigge på hver tale som en måling, i stedet for at se på den samlede sum over alle talers ord, da der måske kun er een tale eller to taler, der står for alle forekomster af "indvandre". Vi vil derfor gerne kigge på tendensen i de individuelle taler.
 
